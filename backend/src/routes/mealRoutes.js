@@ -1,72 +1,79 @@
 const router = require("express").Router();
 const Meal = require("../models/Meal");
 
-// GET /api/meals/grouped?mood=Happy&hungerLevel=Light&preference=Healthy
+/**
+ * GET /api/meals/grouped
+ * Query params:
+ * mood=Happy
+ * hungerLevel=Light|Moderate|Very Hungry
+ * preference=Healthy|Comfort|Balanced|Surprise
+ *
+ * Returns randomized results grouped per category.
+ */
 router.get("/grouped", async (req, res) => {
   try {
     const { mood, hungerLevel, preference } = req.query;
 
-    if (!mood) return res.status(400).json({ error: "Mood is required" });
+    if (!mood) return res.status(400).json({ error: "mood is required" });
     if (!hungerLevel) return res.status(400).json({ error: "hungerLevel is required" });
     if (!preference) return res.status(400).json({ error: "preference is required" });
 
-    // Base filter (always apply mood + hunger)
-    const query = { mood, hungerLevel };
-
-    // If preference is Surprise, do NOT filter by preference
-    // Otherwise filter normally
-    if (preference !== "Surprise") {
-      query.preference = preference; // Healthy / Comfort / Balanced
-    }
-
-    // Get all matching meals
-    const meals = await Meal.find(query);
-
-    // Group by category
-    const grouped = {
-      "Full Meal": [],
-      Appetizer: [],
-      Dessert: [],
-      Drink: [],
-      Snack: [],
+    // Match filters:
+    // Surprise => do not filter preference (mix all)
+    const match = {
+      mood,
+      hungerLevel,
+      ...(preference === "Surprise" ? {} : { preference }),
     };
 
-    for (const m of meals) {
-      if (!grouped[m.category]) grouped[m.category] = [];
-      grouped[m.category].push(m);
-    }
+    // How many random items per category
+    const perCategory = 3;
 
-    // Random pick helper (returns up to N random items)
-    const pickRandom = (arr, count) => {
-      const copy = [...arr];
-      for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
+    // Randomize inside MongoDB using aggregation
+    const [result] = await Meal.aggregate([
+      { $match: match },
+      {
+        $facet: {
+          "Full Meal": [
+            { $match: { category: "Full Meal" } },
+            { $sample: { size: perCategory } }
+          ],
+          "Appetizer": [
+            { $match: { category: "Appetizer" } },
+            { $sample: { size: perCategory } }
+          ],
+          "Dessert": [
+            { $match: { category: "Dessert" } },
+            { $sample: { size: perCategory } }
+          ],
+          "Drink": [
+            { $match: { category: "Drink" } },
+            { $sample: { size: perCategory } }
+          ],
+          "Snack": [
+            { $match: { category: "Snack" } },
+            { $sample: { size: perCategory } }
+          ]
+        }
       }
-      return copy.slice(0, count);
-    };
+    ]);
 
-    // Choose how many per category:
-    const result = {
-      "Full Meal": pickRandom(grouped["Full Meal"], 2),
-      Appetizer: pickRandom(grouped["Appetizer"], 2),
-      Dessert: pickRandom(grouped["Dessert"], 2),
-      Drink: pickRandom(grouped["Drink"], 2),
-      Snack: pickRandom(grouped["Snack"], 2),
+    const grouped = result || {
+      "Full Meal": [],
+      "Appetizer": [],
+      "Dessert": [],
+      "Drink": [],
+      "Snack": []
     };
 
     return res.json({
       mood,
       hungerLevel,
       preference,
-      grouped: result,
-      note:
-        preference === "Surprise"
-          ? "Surprise mode: mixed preferences"
-          : "Filtered mode: preference applied",
+      grouped
     });
   } catch (err) {
-    return res.status(500).json({ error: "Server error" });
+    return res.status(500).json({ error: "server error" });
   }
 });
 
