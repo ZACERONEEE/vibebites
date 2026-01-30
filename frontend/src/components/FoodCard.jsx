@@ -22,6 +22,15 @@ export default function FoodCard({ item }) {
     [item]
   );
 
+  // ✅ SUPPORT BOTH nutrition formats
+  const calories = item?.nutrition?.calories ?? item.calories ?? null;
+  const protein_g = item?.nutrition?.protein_g ?? item.protein_g ?? null;
+  const carbs_g = item?.nutrition?.carbs_g ?? item.carbs_g ?? null;
+  const fat_g = item?.nutrition?.fat_g ?? item.fat_g ?? null;
+
+  const hasNutrition =
+    calories !== null || protein_g !== null || carbs_g !== null || fat_g !== null;
+
   useEffect(() => {
     const list = getSaved();
     setSavedState(list.some((x) => x.key === key));
@@ -47,23 +56,21 @@ export default function FoodCard({ item }) {
       preference: item.preference,
       mealTime: item.mealTime || "",
       isVegetarian: !!item.isVegetarian,
-      calories: item.calories ?? null,
-      protein_g: item.protein_g ?? null,
-      carbs_g: item.carbs_g ?? null,
-      fat_g: item.fat_g ?? null,
+      allergenTags: item.allergenTags || [],
       imageUrl: item.imageUrl || "",
+
+      // store nutrition in BOTH formats for compatibility
+      nutrition: { calories, protein_g, carbs_g, fat_g },
+      calories,
+      protein_g,
+      carbs_g,
+      fat_g,
     };
 
     const next = [payload, ...list].slice(0, 200);
     setSaved(next);
     setSavedState(true);
   };
-
-  const hasNutrition =
-    item.calories !== null ||
-    item.protein_g !== null ||
-    item.carbs_g !== null ||
-    item.fat_g !== null;
 
   const imgSrc = item.imageUrl && item.imageUrl.trim() ? item.imageUrl : "/logo.png";
 
@@ -122,6 +129,11 @@ export default function FoodCard({ item }) {
                   {item.mealTime}
                 </span>
               )}
+              {Array.isArray(item.allergenTags) && item.allergenTags.length > 0 && (
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                  Contains: {item.allergenTags.join(", ")}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -143,16 +155,16 @@ export default function FoodCard({ item }) {
               ) : (
                 <ul className="space-y-1">
                   <li>
-                    Calories: <b>{item.calories ?? "N/A"}</b>
+                    Calories: <b>{calories ?? "N/A"}</b>
                   </li>
                   <li>
-                    Protein (g): <b>{item.protein_g ?? "N/A"}</b>
+                    Protein (g): <b>{protein_g ?? "N/A"}</b>
                   </li>
                   <li>
-                    Carbs (g): <b>{item.carbs_g ?? "N/A"}</b>
+                    Carbs (g): <b>{carbs_g ?? "N/A"}</b>
                   </li>
                   <li>
-                    Fat (g): <b>{item.fat_g ?? "N/A"}</b>
+                    Fat (g): <b>{fat_g ?? "N/A"}</b>
                   </li>
                 </ul>
               )}
