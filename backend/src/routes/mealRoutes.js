@@ -8,7 +8,8 @@ const Meal = require("../models/Meal");
  * hungerLevel=Light|Moderate|Very Hungry
  * preference=Healthy|Comfort|Balanced|Surprise
  * vegetarian=true|false (optional)
- * mealTime=Breakfast|Lunch|Dinner (optional; Step 4)
+ * mealTime=Breakfast|Lunch|Dinner (optional)
+ * avoid=seafood,dairy,nuts,egg (optional; comma-separated)
  *
  * Returns grouped results:
  * { fullMeals: [], appetizers: [], desserts: [], drinks: [], snacks: [] }
@@ -17,28 +18,41 @@ router.get("/", async (req, res) => {
   try {
     const { mood, hungerLevel, preference, vegetarian, mealTime } = req.query;
 
+    // avoid list (comma-separated)
+    const avoid = req.query.avoid ? req.query.avoid.split(",") : [];
+
+    // required fields
     if (!mood) return res.status(400).json({ error: "mood is required" });
     if (!hungerLevel) return res.status(400).json({ error: "hungerLevel is required" });
     if (!preference) return res.status(400).json({ error: "preference is required" });
 
-    const query = {
-      mood,
-      hungerLevel,
-    };
+    // base query
+    const query = { mood, hungerLevel };
 
-    // Surprise means "do not filter preference"
-    if (preference !== "Surprise") query.preference = preference;
+    // preference filter (Surprise = no preference filter)
+    if (preference !== "Surprise") {
+      query.preference = preference; // Healthy / Comfort / Balanced
+    }
 
     // vegetarian filter
-    if (vegetarian === "true") query.isVegetarian = true;
+    if (vegetarian === "true") {
+      query.isVegetarian = true;
+    }
 
-    // mealTime filter (we will add UI in Step 4)
-    if (mealTime) query.mealTime = mealTime;
+    // mealTime filter (if provided)
+    if (mealTime) {
+      query.mealTime = mealTime; // Breakfast / Lunch / Dinner
+    }
 
-    // find matches
+    // allergy avoidance filter (exclude meals containing any avoid tags)
+    if (avoid.length > 0) {
+      query.allergenTags = { $nin: avoid };
+    }
+
+    // fetch matching meals
     const meals = await Meal.find(query).lean();
 
-    // helper to shuffle and pick up to N items
+    // shuffle and pick helper (randomness)
     const pickRandom = (arr, n = 3) => {
       const copy = [...arr];
       for (let i = copy.length - 1; i > 0; i--) {
@@ -48,7 +62,7 @@ router.get("/", async (req, res) => {
       return copy.slice(0, n);
     };
 
-    // group by category
+    // grouped by category
     const fullMeals = pickRandom(meals.filter((m) => m.category === "Full Meal"), 3);
     const appetizers = pickRandom(meals.filter((m) => m.category === "Appetizer"), 3);
     const desserts = pickRandom(meals.filter((m) => m.category === "Dessert"), 3);
@@ -57,6 +71,7 @@ router.get("/", async (req, res) => {
 
     return res.json({ fullMeals, appetizers, desserts, drinks, snacks });
   } catch (err) {
+    console.error(err);
     return res.status(500).json({ error: "server error" });
   }
 });
