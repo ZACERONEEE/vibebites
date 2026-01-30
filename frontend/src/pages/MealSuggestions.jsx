@@ -1,50 +1,25 @@
 import { useEffect, useState } from "react";
-import { useLocation, Link } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+
+import DisclaimerBox from "../components/DisclaimerBox";
+import FoodCard from "../components/FoodCard";
 import LoadingOverlay from "../components/LoadingOverlay";
 
-const API = "https://vibebites-backend.onrender.com";
-
-function Section({ title, items }) {
-  if (!items || items.length === 0) return null;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
-          {title}
-        </h3>
-        <span className="text-xs text-slate-500 dark:text-slate-300">
-          {items.length} item(s)
-        </span>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-2">
-        {items.map((m) => (
-          <div
-            key={m._id || `${m.name}-${title}`}
-            className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900"
-          >
-            <div className="text-base font-extrabold text-slate-900 dark:text-slate-100">
-              {m.name}
-            </div>
-            <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              {m.description}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function MealSuggestions() {
-  const { state } = useLocation();
-  const mood = state?.mood;
-  const hungerLevel = state?.hungerLevel;
-  const preference = state?.preference;
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const [grouped, setGrouped] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const {
+    mood,
+    hungerLevel,
+    preference,
+    vegetarianOnly = false,
+    mealTime = "",
+    avoid = [],
+  } = location.state || {};
+
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const fetchMeals = async () => {
@@ -52,104 +27,140 @@ export default function MealSuggestions() {
       setLoading(true);
       setError("");
 
-      const url =
-        `${API}/api/meals/grouped?` +
-        `mood=${encodeURIComponent(mood)}` +
-        `&hungerLevel=${encodeURIComponent(hungerLevel)}` +
-        `&preference=${encodeURIComponent(preference)}`;
+      if (!mood || !hungerLevel || !preference) {
+        navigate("/");
+        return;
+      }
 
-      const res = await fetch(url);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to load meals");
+      const params = new URLSearchParams({
+        mood,
+        hungerLevel,
+        preference,
+      });
 
-      setGrouped(data.grouped);
-    } catch (e) {
-      setError(e.message || "Load failed");
+      if (vegetarianOnly) params.append("vegetarian", "true");
+      if (mealTime) params.append("mealTime", mealTime);
+
+      // ✅ add avoid list
+      if (avoid && avoid.length > 0) {
+        params.append("avoid", avoid.join(","));
+      }
+
+      const res = await fetch(
+        `${process.env.REACT_APP_API_URL}/api/meals?${params.toString()}`
+      );
+
+      if (!res.ok) throw new Error("Failed to fetch meal suggestions");
+      const json = await res.json();
+
+      setData(json);
+    } catch (err) {
+      setError(err.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!mood || !hungerLevel || !preference) return;
     fetchMeals();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mood, hungerLevel, preference]);
+  }, [mood, hungerLevel, preference, vegetarianOnly, mealTime, JSON.stringify(avoid)]);
 
-  if (!mood || !hungerLevel || !preference) {
+  if (loading) {
+    return <LoadingOverlay show={true} label="Finding food suggestions..." />;
+  }
+
+  if (error) {
     return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="text-xl font-extrabold dark:text-slate-100">
-          Missing selections
-        </h2>
-        <p className="mt-2 text-slate-600 dark:text-slate-300">
-          Please answer questions and select a mood.
-        </p>
-        <Link
-          to="/questions"
-          className="mt-4 inline-flex rounded-2xl bg-slate-900 px-4 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-900"
+      <div className="mx-auto max-w-xl p-6 text-center">
+        <p className="text-red-600 font-bold">{error}</p>
+        <button
+          onClick={() => navigate(-1)}
+          className="mt-4 rounded-xl bg-slate-900 px-5 py-2 text-white font-bold"
         >
-          Go to Questions
-        </Link>
+          Go back
+        </button>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <LoadingOverlay show={loading} label="Generating recommendations..." />
+  if (!data) return null;
 
-      <div className="fade-in">
-        <div className="text-sm font-semibold text-slate-500 dark:text-slate-300">
-          Your selection
-        </div>
-        <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100">
-          Suggestions for: {mood}
+  const { fullMeals, appetizers, desserts, drinks, snacks } = data;
+
+  const Section = ({ title, items }) => {
+    if (!items || items.length === 0) return null;
+
+    return (
+      <section className="mt-8">
+        <h2 className="mb-4 text-xl font-extrabold text-slate-900 dark:text-slate-100">
+          {title}
         </h2>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-          Hunger: <b>{hungerLevel}</b> • Preference: <b>{preference}</b>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {items.map((item) => (
+            <FoodCard key={item._id || `${item.name}-${title}`} item={item} />
+          ))}
+        </div>
+      </section>
+    );
+  };
+
+  return (
+    <div className="mx-auto max-w-4xl p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">
+          Your Food Suggestions
+        </h1>
+        <p className="mt-1 text-slate-600 dark:text-slate-300">
+          Based on your mood, hunger level, and preference
         </p>
-        <div className="mt-4 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent dark:via-slate-700" />
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Link
-          to="/moods"
-          className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-800 shadow-sm transition hover:shadow dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+      <DisclaimerBox />
+
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+        <div className="font-extrabold text-slate-900 dark:text-slate-100">
+          Why these were suggested
+        </div>
+        <div className="mt-1 leading-relaxed">
+          Based on your selections: <b>{mood}</b> • <b>{hungerLevel}</b> •{" "}
+          <b>{preference}</b>
+          {vegetarianOnly ? " • Vegetarian only" : ""}
+          {mealTime ? ` • ${mealTime}` : ""}
+          {avoid.length > 0 ? ` • Avoid: ${avoid.join(", ")}` : ""}
+          {preference === "Surprise" ? (
+            <>
+              <br />
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                Surprise mode shows mixed options for variety.
+              </span>
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      <Section title="Full Meals" items={fullMeals} />
+      <Section title="Appetizers" items={appetizers} />
+      <Section title="Desserts" items={desserts} />
+      <Section title="Drinks" items={drinks} />
+      <Section title="Snacks" items={snacks} />
+
+      <div className="mt-10 flex flex-wrap justify-center gap-3">
+        <button
+          onClick={() => navigate(-1)}
+          className="rounded-2xl border border-slate-300 px-6 py-3 font-bold text-slate-800 transition hover:bg-slate-100 active:scale-95 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
         >
-          Change mood
-        </Link>
+          Change selections
+        </button>
 
         <button
           onClick={fetchMeals}
-          className="rounded-2xl bg-orange-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:opacity-95 active:scale-95"
+          className="rounded-2xl bg-orange-600 px-6 py-3 font-bold text-white transition hover:opacity-95 active:scale-95"
         >
           Regenerate 🔄
         </button>
-
-        <Link
-          to="/feedback"
-          className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:opacity-95 dark:bg-white dark:text-slate-900"
-        >
-          Leave feedback
-        </Link>
       </div>
-
-      {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200">
-          {error}
-        </div>
-      )}
-
-      {!loading && !error && grouped && (
-        <div className="space-y-8">
-          <Section title="Full Meal" items={grouped["Full Meal"]} />
-          <Section title="Appetizer" items={grouped["Appetizer"]} />
-          <Section title="Dessert" items={grouped["Dessert"]} />
-          <Section title="Drink" items={grouped["Drink"]} />
-          <Section title="Snack" items={grouped["Snack"]} />
-        </div>
-      )}
     </div>
   );
 }
