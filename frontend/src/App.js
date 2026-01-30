@@ -7,6 +7,8 @@ import MoodSelection from "./pages/MoodSelection";
 import MealSuggestions from "./pages/MealSuggestions";
 import FeedbackPage from "./pages/FeedbackPage";
 import AboutPage from "./pages/AboutPage";
+import SavedMeals from "./pages/SavedMeals";
+
 
 import { ThemeProvider } from "./theme";
 
@@ -35,6 +37,7 @@ export default function App() {
             <Route path="/suggestions" element={<PageShell><MealSuggestions /></PageShell>} />
             <Route path="/feedback" element={<PageShell><FeedbackPage /></PageShell>} />
             <Route path="/about" element={<PageShell><AboutPage /></PageShell>} />
+            <Route path="/saved" element={<PageShell><SavedMeals /></PageShell>} />
           </Routes>
         </div>
       </Router>
