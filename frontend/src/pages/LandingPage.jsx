@@ -10,7 +10,7 @@ export default function LandingPage() {
           ✨ Mood-based meal suggestions
         </div>
 
-        <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 md:text-5xl dark:text-slate-100">
+        <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 md:text-6xl dark:text-slate-100">
           VibeBites
           <span className="block bg-gradient-to-r from-orange-500 to-emerald-500 bg-clip-text text-transparent">
             Eat what you feel.
@@ -23,7 +23,7 @@ export default function LandingPage() {
 
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => navigate("/questions")}
+            onClick={() => navigate("/moods")}
             className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-lg transition hover:scale-[1.02] active:scale-95 hover:bg-slate-800 dark:bg-white dark:text-slate-900"
           >
             Start Now →

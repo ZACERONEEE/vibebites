@@ -148,7 +148,13 @@ export default function MealSuggestions() {
 
       <div className="mt-10 flex flex-wrap justify-center gap-3">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate("/moods")}
+          className="rounded-2xl border border-slate-300 px-6 py-3 font-bold text-slate-800 transition hover:bg-slate-100 active:scale-95 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          Change mood
+        </button>
+        <button
+          onClick={() => navigate("/questions", { state: { mood } })}
           className="rounded-2xl border border-slate-300 px-6 py-3 font-bold text-slate-800 transition hover:bg-slate-100 active:scale-95 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           Change selections

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const ALLERGENS = [
   { key: "seafood", label: "Seafood" },
@@ -10,13 +10,17 @@ const ALLERGENS = [
 
 export default function PreMoodQuestions() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // ✅ mood comes from MoodSelection now
+  const mood = location.state?.mood;
 
   const [answers, setAnswers] = useState({
     hungerLevel: "",
     preference: "",
     vegetarianOnly: false,
     mealTime: "",
-    avoid: [], // NEW
+    avoid: [],
   });
 
   const toggleAvoid = (key) => {
@@ -30,21 +34,46 @@ export default function PreMoodQuestions() {
   };
 
   const goNext = () => {
+    if (!mood) {
+      alert("Please select a mood first.");
+      navigate("/moods");
+      return;
+    }
+
     if (!answers.hungerLevel || !answers.preference) {
       alert("Please answer hunger level and preference.");
       return;
     }
-    navigate("/moods", { state: { preAnswers: answers } });
+
+    // ✅ go straight to Suggestions now
+    navigate("/suggestions", {
+      state: {
+        mood,
+        hungerLevel: answers.hungerLevel,
+        preference: answers.preference,
+        vegetarianOnly: answers.vegetarianOnly,
+        mealTime: answers.mealTime,
+        avoid: answers.avoid,
+      },
+    });
   };
 
   return (
-    <div className="fade-in mx-auto max-w-xl space-y-6">
+    <div className="fade-in mx-auto max-w-xl space-y-6 p-6">
       <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100">
           Quick Check-in
         </h2>
+
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-          Choose your hunger level and preference to personalize recommendations.
+          {mood ? (
+            <>
+              Mood selected: <b>{mood}</b>. Now choose your hunger level and
+              preference.
+            </>
+          ) : (
+            <>Please select your mood first.</>
+          )}
         </p>
 
         <div className="mt-4 space-y-4">
@@ -81,7 +110,6 @@ export default function PreMoodQuestions() {
               <option value="Healthy">Healthy options</option>
               <option value="Comfort">Comfort food</option>
               <option value="Balanced">Balanced</option>
-              <option value="Surprise">Surprise me</option>
             </select>
           </div>
 
@@ -103,7 +131,6 @@ export default function PreMoodQuestions() {
             </select>
           </div>
 
-          {/* Vegetarian only */}
           <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-800 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
             <input
               type="checkbox"
@@ -116,11 +143,11 @@ export default function PreMoodQuestions() {
             Vegetarian only
           </label>
 
-          {/* Avoid allergens */}
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950">
             <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
               Avoid (optional)
             </div>
+
             <div className="mt-2 grid grid-cols-2 gap-2">
               {ALLERGENS.map((a) => (
                 <label
@@ -137,6 +164,7 @@ export default function PreMoodQuestions() {
                 </label>
               ))}
             </div>
+
             <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
               This helps filter out meals tagged with these ingredients.
             </div>
@@ -147,7 +175,7 @@ export default function PreMoodQuestions() {
           onClick={goNext}
           className="mt-6 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-extrabold text-white shadow-lg transition hover:scale-[1.01] active:scale-95 dark:bg-white dark:text-slate-900"
         >
-          Continue to Mood Selection →
+          Continue to Recommendations →
         </button>
       </div>
     </div>

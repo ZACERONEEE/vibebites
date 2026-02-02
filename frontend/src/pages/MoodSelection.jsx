@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import LoadingOverlay from "../components/LoadingOverlay";
 
 const EMOJI = {
@@ -13,14 +13,6 @@ const EMOJI = {
 
 export default function MoodSelection() {
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const preAnswers = location.state?.preAnswers || {};
-  const hungerLevel = preAnswers?.hungerLevel;
-  const preference = preAnswers?.preference;
-  const vegetarianOnly = preAnswers?.vegetarianOnly || false;
-  const mealTime = preAnswers?.mealTime || "";
-  const avoid = Array.isArray(preAnswers?.avoid) ? preAnswers.avoid : [];
 
   const [moods, setMoods] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -32,9 +24,7 @@ export default function MoodSelection() {
         setLoading(true);
         setError("");
 
-        const res = await fetch(
-          `${process.env.REACT_APP_API_URL}/api/moods`
-        );
+        const res = await fetch(`${process.env.REACT_APP_API_URL}/api/moods`);
         if (!res.ok) throw new Error("Failed to fetch moods");
 
         const data = await res.json();
@@ -49,39 +39,9 @@ export default function MoodSelection() {
     fetchMoods();
   }, []);
 
-  // If user came here without answering questions first
-  if (!hungerLevel || !preference) {
-    return (
-      <div className="mx-auto max-w-xl p-6">
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100">
-            Missing answers
-          </h2>
-          <p className="mt-2 text-slate-600 dark:text-slate-300">
-            Please answer the quick check-in first.
-          </p>
-          <Link
-            to="/questions"
-            className="mt-4 inline-flex rounded-2xl bg-slate-900 px-4 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-900"
-          >
-            Go to Questions
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   const chooseMood = (mood) => {
-    navigate("/suggestions", {
-      state: {
-        mood,
-        hungerLevel,
-        preference,
-        vegetarianOnly,
-        mealTime,
-        avoid, // ✅ pass avoid list forward
-      },
-    });
+    // ✅ Now we go to questions AFTER selecting mood
+    navigate("/questions", { state: { mood } });
   };
 
   return (
@@ -93,10 +53,7 @@ export default function MoodSelection() {
           Choose your mood
         </h2>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-          Hunger: <b>{hungerLevel}</b> • Preference: <b>{preference}</b>
-          {vegetarianOnly ? " • Vegetarian only" : ""}
-          {mealTime ? ` • ${mealTime}` : ""}
-          {avoid.length > 0 ? ` • Avoid: ${avoid.join(", ")}` : ""}
+          Select how you feel first, then we’ll ask a few quick questions.
         </p>
         <div className="mt-4 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent dark:via-slate-700" />
       </div>
