@@ -15,6 +15,8 @@ const router = express.Router();
  *
  * Returns grouped results:
  * fullMeals, appetizers, desserts, drinks, snacks
+ *
+ * Important: uses $sample so Regenerate always changes when possible
  */
 
 router.get("/", async (req, res) => {
@@ -26,78 +28,80 @@ router.get("/", async (req, res) => {
       mealTime,
       vegetarian,
       avoid,
+      limit,
     } = req.query;
 
-    const query = {};
-
-    if (mood) query.mood = mood;
-    if (hungerLevel) query.hungerLevel = hungerLevel;
-    if (preference) query.preference = preference;
-    if (mealTime) query.mealTime = mealTime;
-
-    // ✅ Vegetarian filter (strict)
     const vegetarianOnly = String(vegetarian).toLowerCase() === "true";
-    if (vegetarianOnly) {
-      query.isVegetarian = true;
-    }
-
-    // ✅ Avoid filter (comma-separated list)
-    if (avoid) {
-      const avoidList = String(avoid)
-        .split(",")
-        .map((x) => x.trim().toLowerCase())
-        .filter(Boolean);
-
-      if (avoidList.length > 0) {
-        // Meals that contain any of the avoid tags will be excluded
-        query.allergenTags = { $nin: avoidList };
-      }
-    }
-
-    // Fetch meals
-    const meals = await Meal.find(query).lean();
-
-    // ✅ Group by category (strict)
-    const grouped = {
-      fullMeals: [],
-      appetizers: [],
-      desserts: [],
-      drinks: [],
-      snacks: [],
-    };
-
-    for (const m of meals) {
-      const cat = (m.category || "").toLowerCase();
-      if (cat === "full meal") grouped.fullMeals.push(m);
-      else if (cat === "appetizer") grouped.appetizers.push(m);
-      else if (cat === "dessert") grouped.desserts.push(m);
-      else if (cat === "drink") grouped.drinks.push(m);
-      else if (cat === "snack") grouped.snacks.push(m);
-    }
-
-    // ✅ Randomize + prioritize NON-VEG when vegetarianOnly is OFF
-    const shuffle = (arr) => arr.sort(() => Math.random() - 0.5);
-
     const preferNonVeg = !vegetarianOnly;
 
+    const avoidList = avoid
+      ? String(avoid)
+          .split(",")
+          .map((x) => x.trim().toLowerCase())
+          .filter(Boolean)
+      : [];
+
+    const baseMatch = {};
+    if (mood) baseMatch.mood = mood;
+    if (hungerLevel) baseMatch.hungerLevel = hungerLevel;
+    if (preference) baseMatch.preference = preference;
+    if (mealTime) baseMatch.mealTime = mealTime;
+
+    if (vegetarianOnly) baseMatch.isVegetarian = true;
+
+    if (avoidList.length > 0) {
+      baseMatch.allergenTags = { $nin: avoidList };
+    }
+
+    const perGroup = Math.max(3, Math.min(Number(limit) || 6, 12)); // default 6 per category
+
+    // Pull random samples per category from MongoDB
+    const [result] = await Meal.aggregate([
+      { $match: baseMatch },
+      {
+        $facet: {
+          fullMeals: [
+            { $match: { category: "Full Meal" } },
+            { $sample: { size: perGroup * 3 } }, // oversample
+          ],
+          appetizers: [
+            { $match: { category: "Appetizer" } },
+            { $sample: { size: perGroup * 3 } },
+          ],
+          desserts: [
+            { $match: { category: "Dessert" } },
+            { $sample: { size: perGroup * 3 } },
+          ],
+          drinks: [
+            { $match: { category: "Drink" } },
+            { $sample: { size: perGroup * 3 } },
+          ],
+          snacks: [
+            { $match: { category: "Snack" } },
+            { $sample: { size: perGroup * 3 } },
+          ],
+        },
+      },
+    ]);
+
     const orderGroup = (arr) => {
-      const shuffled = shuffle(arr);
-
-      // If vegetarianOnly is ON, just return shuffled veg meals
-      if (!preferNonVeg) return shuffled;
-
-      // If vegetarianOnly is OFF, show non-veg first (more "realistic")
-      const nonVeg = shuffled.filter((x) => x.isVegetarian === false);
-      const veg = shuffled.filter((x) => x.isVegetarian === true);
-
-      return [...nonVeg, ...veg];
+      if (!arr) return [];
+      // If vegetarianOnly is OFF, show non-veg first (more realistic)
+      if (preferNonVeg) {
+        const nonVeg = arr.filter((m) => m.isVegetarian === false);
+        const veg = arr.filter((m) => m.isVegetarian === true);
+        return [...nonVeg, ...veg].slice(0, perGroup);
+      }
+      return arr.slice(0, perGroup);
     };
 
-    grouped.fullMeals = orderGroup(grouped.fullMeals);
-    grouped.appetizers = orderGroup(grouped.appetizers);
-    grouped.desserts = orderGroup(grouped.desserts);
-    grouped.drinks = orderGroup(grouped.drinks);
-    grouped.snacks = orderGroup(grouped.snacks);
+    const grouped = {
+      fullMeals: orderGroup(result?.fullMeals),
+      appetizers: orderGroup(result?.appetizers),
+      desserts: orderGroup(result?.desserts),
+      drinks: orderGroup(result?.drinks),
+      snacks: orderGroup(result?.snacks),
+    };
 
     return res.json(grouped);
   } catch (err) {
