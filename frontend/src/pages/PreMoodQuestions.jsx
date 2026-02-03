@@ -6,13 +6,15 @@ const ALLERGENS = [
   { key: "dairy", label: "Dairy" },
   { key: "nuts", label: "Nuts" },
   { key: "egg", label: "Egg" },
+  { key: "soy", label: "Soy" },
+  { key: "gluten", label: "Gluten" },
+  { key: "chicken", label: "Chicken" },
 ];
 
 export default function PreMoodQuestions() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ mood comes from MoodSelection now
   const mood = location.state?.mood;
 
   const [answers, setAnswers] = useState({
@@ -21,6 +23,7 @@ export default function PreMoodQuestions() {
     vegetarianOnly: false,
     mealTime: "",
     avoid: [],
+    specialPopulation: "none", // none | pregnant | lactating
   });
 
   const toggleAvoid = (key) => {
@@ -45,7 +48,6 @@ export default function PreMoodQuestions() {
       return;
     }
 
-    // ✅ go straight to Suggestions now
     navigate("/suggestions", {
       state: {
         mood,
@@ -54,9 +56,14 @@ export default function PreMoodQuestions() {
         vegetarianOnly: answers.vegetarianOnly,
         mealTime: answers.mealTime,
         avoid: answers.avoid,
+        specialPopulation: answers.specialPopulation,
       },
     });
   };
+
+  const showSpecialWarning =
+    answers.specialPopulation === "pregnant" ||
+    answers.specialPopulation === "lactating";
 
   return (
     <div className="fade-in mx-auto max-w-xl space-y-6 p-6">
@@ -76,7 +83,33 @@ export default function PreMoodQuestions() {
           )}
         </p>
 
-        <div className="mt-4 space-y-4">
+        {/* Special population */}
+        <div className="mt-5">
+          <label className="text-sm font-bold dark:text-slate-200">
+            Special population (optional)
+          </label>
+          <select
+            className="mt-2 w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            value={answers.specialPopulation}
+            onChange={(e) =>
+              setAnswers((p) => ({ ...p, specialPopulation: e.target.value }))
+            }
+          >
+            <option value="none">None</option>
+            <option value="pregnant">Pregnant</option>
+            <option value="lactating">Lactating / Breastfeeding</option>
+          </select>
+
+          {showSpecialWarning && (
+            <div className="mt-3 rounded-2xl border border-yellow-300 bg-yellow-50 p-3 text-xs font-semibold text-yellow-900 dark:border-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-100">
+              ⚠️ Reminder: This system provides general recommendations only.
+              For pregnant/lactating individuals, consult a qualified health
+              professional for personalized dietary guidance.
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 space-y-4">
           <div>
             <label className="text-sm font-bold dark:text-slate-200">
               Hunger level
@@ -143,6 +176,7 @@ export default function PreMoodQuestions() {
             Vegetarian only
           </label>
 
+          {/* Avoid allergens */}
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950">
             <div className="text-sm font-extrabold text-slate-900 dark:text-slate-100">
               Avoid (optional)
