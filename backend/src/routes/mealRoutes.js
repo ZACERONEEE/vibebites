@@ -1,79 +1,93 @@
-const router = require("express").Router();
-const Meal = require("../models/Meal");
+import express from "express";
+import Meal from "../models/Meal.js";
+
+const router = express.Router();
 
 /**
  * GET /api/meals
  * Query params:
- * mood=Happy
- * hungerLevel=Light|Moderate|Very Hungry
- * preference=Healthy|Comfort|Balanced|Surprise
- * vegetarian=true|false (optional)
- * mealTime=Breakfast|Lunch|Dinner (optional)
- * avoid=seafood,dairy,nuts,egg (optional; comma-separated)
+ * - mood
+ * - hungerLevel
+ * - preference
+ * - mealTime (optional)
+ * - vegetarian=true/false (optional)
+ * - avoid=seafood,dairy,nuts,egg,soy,gluten,chicken (optional)
  *
  * Returns grouped results:
- * { fullMeals: [], appetizers: [], desserts: [], drinks: [], snacks: [] }
+ * fullMeals, appetizers, desserts, drinks, snacks
  */
+
 router.get("/", async (req, res) => {
   try {
-    const { mood, hungerLevel, preference, vegetarian, mealTime } = req.query;
+    const {
+      mood,
+      hungerLevel,
+      preference,
+      mealTime,
+      vegetarian,
+      avoid,
+    } = req.query;
 
-    // avoid list (comma-separated)
-    const avoid = req.query.avoid ? req.query.avoid.split(",") : [];
+    const query = {};
 
-    // required fields
-    if (!mood) return res.status(400).json({ error: "mood is required" });
-    if (!hungerLevel) return res.status(400).json({ error: "hungerLevel is required" });
-    if (!preference) return res.status(400).json({ error: "preference is required" });
-
-    // base query
-    const query = { mood, hungerLevel };
-
-    // preference filter (Surprise = no preference filter)
-    if (preference !== "Surprise") {
-      query.preference = preference; // Healthy / Comfort / Balanced
-    }
+    if (mood) query.mood = mood;
+    if (hungerLevel) query.hungerLevel = hungerLevel;
+    if (preference) query.preference = preference;
+    if (mealTime) query.mealTime = mealTime;
 
     // vegetarian filter
-    if (vegetarian === "true") {
+    if (String(vegetarian).toLowerCase() === "true") {
       query.isVegetarian = true;
     }
 
-    // mealTime filter (if provided)
-    if (mealTime) {
-      query.mealTime = mealTime; // Breakfast / Lunch / Dinner
+    // avoid filter (comma-separated)
+    if (avoid) {
+      const avoidList = String(avoid)
+        .split(",")
+        .map((x) => x.trim().toLowerCase())
+        .filter(Boolean);
+
+      if (avoidList.length > 0) {
+        // allergenTags are stored as lowercase strings in your dataset
+        query.allergenTags = { $nin: avoidList };
+      }
     }
 
-    // allergy avoidance filter (exclude meals containing any avoid tags)
-    if (avoid.length > 0) {
-      query.allergenTags = { $nin: avoid };
-    }
-
-    // fetch matching meals
     const meals = await Meal.find(query).lean();
 
-    // shuffle and pick helper (randomness)
-    const pickRandom = (arr, n = 3) => {
-      const copy = [...arr];
-      for (let i = copy.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [copy[i], copy[j]] = [copy[j], copy[i]];
-      }
-      return copy.slice(0, n);
+    // ✅ Group by category
+    const grouped = {
+      fullMeals: [],
+      appetizers: [],
+      desserts: [],
+      drinks: [],
+      snacks: [],
     };
 
-    // grouped by category
-    const fullMeals = pickRandom(meals.filter((m) => m.category === "Full Meal"), 3);
-    const appetizers = pickRandom(meals.filter((m) => m.category === "Appetizer"), 3);
-    const desserts = pickRandom(meals.filter((m) => m.category === "Dessert"), 3);
-    const drinks = pickRandom(meals.filter((m) => m.category === "Drink"), 3);
-    const snacks = pickRandom(meals.filter((m) => m.category === "Snack"), 3);
+    for (const m of meals) {
+      const cat = (m.category || "").toLowerCase();
 
-    return res.json({ fullMeals, appetizers, desserts, drinks, snacks });
+      if (cat === "full meal") grouped.fullMeals.push(m);
+      else if (cat === "appetizer") grouped.appetizers.push(m);
+      else if (cat === "dessert") grouped.desserts.push(m);
+      else if (cat === "drink") grouped.drinks.push(m);
+      else if (cat === "snack") grouped.snacks.push(m);
+    }
+
+    // ✅ Randomize each group (so Regenerate works)
+    const shuffle = (arr) => arr.sort(() => Math.random() - 0.5);
+
+    grouped.fullMeals = shuffle(grouped.fullMeals);
+    grouped.appetizers = shuffle(grouped.appetizers);
+    grouped.desserts = shuffle(grouped.desserts);
+    grouped.drinks = shuffle(grouped.drinks);
+    grouped.snacks = shuffle(grouped.snacks);
+
+    return res.json(grouped);
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "server error" });
+    console.error("Meals API error:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 });
 
-module.exports = router;
+export default router;
