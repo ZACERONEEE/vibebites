@@ -6,8 +6,27 @@ import FoodCard from "../components/FoodCard";
 import LoadingOverlay from "../components/LoadingOverlay";
 
 const API = process.env.REACT_APP_API_URL || "https://vibebites-backend.onrender.com";
+const SAVED_KEY = "vibebites_saved_meals_v1";
 
-function Section({ title, items }) {
+function safeParse(json, fallback) {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return fallback;
+  }
+}
+
+function loadSavedMeals() {
+  const raw = localStorage.getItem(SAVED_KEY);
+  const arr = safeParse(raw, []);
+  return Array.isArray(arr) ? arr : [];
+}
+
+function saveSavedMeals(arr) {
+  localStorage.setItem(SAVED_KEY, JSON.stringify(arr));
+}
+
+function Section({ title, items, savedIds, onSave }) {
   if (!items || items.length === 0) return null;
 
   return (
@@ -19,7 +38,12 @@ function Section({ title, items }) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         {items.map((meal) => (
-          <FoodCard key={meal._id || `${meal.name}-${title}`} meal={meal} />
+          <FoodCard
+            key={meal._id || `${meal.name}-${title}`}
+            meal={meal}
+            onSave={onSave}
+            isSaved={savedIds.has(meal._id || meal.name)}
+          />
         ))}
       </div>
     </div>
@@ -30,7 +54,6 @@ export default function MealSuggestions() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // values passed from MoodSelection (or previous page)
   const {
     mood,
     hungerLevel,
@@ -40,39 +63,68 @@ export default function MealSuggestions() {
     avoid = [],
   } = location.state || {};
 
-  const [grouped, setGrouped] = useState(null); // grouped results
-  const [meta, setMeta] = useState(null); // filters, count etc
+  const [grouped, setGrouped] = useState(null);
+  const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // used to force "Regenerate"
+  // Regenerate trigger
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // ✅ Saved meals (localStorage)
+  const [savedMeals, setSavedMeals] = useState(() => {
+    if (typeof window === "undefined") return [];
+    return loadSavedMeals();
+  });
+
+  const savedIds = useMemo(() => {
+    return new Set(savedMeals.map((m) => m._id || m.name));
+  }, [savedMeals]);
+
+  function handleSaveMeal(meal) {
+    if (!meal) return;
+
+    const id = meal._id || meal.name;
+
+    setSavedMeals((prev) => {
+      const exists = prev.some((m) => (m._id || m.name) === id);
+
+      let next;
+      if (exists) {
+        // unsave
+        next = prev.filter((m) => (m._id || m.name) !== id);
+      } else {
+        // save
+        next = [meal, ...prev];
+      }
+
+      saveSavedMeals(next);
+      return next;
+    });
+  }
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
+
     if (mood) params.set("mood", mood);
     if (hungerLevel) params.set("hungerLevel", hungerLevel);
     if (preference) params.set("preference", preference);
 
-    // backend supports mealTime; allow "Any" to mean "no filter"
     if (mealTime && mealTime !== "Any") params.set("mealTime", mealTime);
 
     if (vegetarianOnly) params.set("vegetarianOnly", "true");
 
     if (Array.isArray(avoid) && avoid.length > 0) {
-      // backend expects comma-separated
       params.set("avoid", avoid.join(","));
     }
 
-    // cache-buster (so regenerate truly refetches)
+    // cache-buster to ensure new request
     params.set("_t", String(Date.now()));
 
     return params.toString();
   }, [mood, hungerLevel, preference, mealTime, vegetarianOnly, avoid]);
 
-
   useEffect(() => {
-    // If user landed here without required data, send them back properly
     if (!mood || !hungerLevel || !preference) {
       setError("Missing answers. Please answer the quick check-in first.");
       setLoading(false);
@@ -90,8 +142,6 @@ export default function MealSuggestions() {
         if (!res.ok) throw new Error(`Request failed (${res.status})`);
 
         const json = await res.json();
-
-        // ✅ IMPORTANT: your backend returns { results: { "Full Meal": [...], ... }, count, filters, mood }
         const results = json.results || null;
 
         if (!cancelled) {
@@ -110,14 +160,16 @@ export default function MealSuggestions() {
     }
 
     load();
+
     return () => {
       cancelled = true;
     };
   }, [query, mood, hungerLevel, preference, refreshKey]);
 
-
   const selectedLine = meta?.filters
-    ? `${meta.filters.mood} · ${meta.filters.hungerLevel} · ${meta.filters.preference} · ${meta.filters.mealTime || "Any"}`
+    ? `${meta.filters.mood} · ${meta.filters.hungerLevel} · ${meta.filters.preference} · ${
+        meta.filters.mealTime || "Any"
+      }`
     : "";
 
   return (
@@ -135,8 +187,14 @@ export default function MealSuggestions() {
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <h3 className="font-semibold text-slate-900">Why these were suggested</h3>
           <p className="mt-1 text-sm text-slate-600">
-            Based on your selections: <span className="font-semibold text-slate-900">{selectedLine}</span>
+            Based on your selections:{" "}
+            <span className="font-semibold text-slate-900">{selectedLine}</span>
           </p>
+          {meta?.count != null ? (
+            <p className="mt-1 text-xs text-slate-500">
+              {meta.count} matching meals in database (showing a few per category).
+            </p>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -151,18 +209,11 @@ export default function MealSuggestions() {
             className="rounded-full border border-slate-300 bg-white px-5 py-2 font-semibold text-slate-800 hover:bg-slate-50"
             onClick={() =>
               navigate("/questions", {
-                state: {
-                mood, // ✅ keep mood
-                hungerLevel,
-                preference,
-                mealTime,
-                vegetarianOnly,
-                avoid,
-                },
+                state: { mood, hungerLevel, preference, mealTime, vegetarianOnly, avoid },
               })
             }
           >
-          Change selections
+            Change selections
           </button>
 
           <button
@@ -170,6 +221,13 @@ export default function MealSuggestions() {
             onClick={() => setRefreshKey((k) => k + 1)}
           >
             Regenerate ↻
+          </button>
+
+          <button
+            className="rounded-full border border-slate-300 bg-white px-5 py-2 font-semibold text-slate-800 hover:bg-slate-50"
+            onClick={() => navigate("/saved")}
+          >
+            View Saved ({savedMeals.length})
           </button>
         </div>
 
@@ -179,18 +237,16 @@ export default function MealSuggestions() {
           </div>
         )}
 
-        {/* ✅ RENDER GROUPED RESULTS */}
         {grouped && (
           <div className="space-y-10">
-            <Section title="Full Meals" items={grouped["Full Meal"]} />
-            <Section title="Appetizers" items={grouped["Appetizer"]} />
-            <Section title="Desserts" items={grouped["Dessert"]} />
-            <Section title="Drinks" items={grouped["Drink"]} />
-            <Section title="Snacks" items={grouped["Snack"]} />
+            <Section title="Full Meals" items={grouped["Full Meal"]} savedIds={savedIds} onSave={handleSaveMeal} />
+            <Section title="Appetizers" items={grouped["Appetizer"]} savedIds={savedIds} onSave={handleSaveMeal} />
+            <Section title="Desserts" items={grouped["Dessert"]} savedIds={savedIds} onSave={handleSaveMeal} />
+            <Section title="Drinks" items={grouped["Drink"]} savedIds={savedIds} onSave={handleSaveMeal} />
+            <Section title="Snacks" items={grouped["Snack"]} savedIds={savedIds} onSave={handleSaveMeal} />
           </div>
         )}
 
-        {/* If grouped is null but no error, show empty state */}
         {!loading && !error && !grouped && (
           <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-700">
             No meals returned.

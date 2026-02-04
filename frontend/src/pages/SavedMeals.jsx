@@ -1,67 +1,119 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import FoodCard from "../components/FoodCard";
 
-function getSaved() {
+const SAVED_KEY = "vibebites_saved_meals_v1";
+
+function safeParse(json, fallback) {
   try {
-    const raw = localStorage.getItem("vb_saved_meals");
-    return raw ? JSON.parse(raw) : [];
+    return JSON.parse(json);
   } catch {
-    return [];
+    return fallback;
   }
 }
 
+function loadSavedMeals() {
+  const raw = localStorage.getItem(SAVED_KEY);
+  const arr = safeParse(raw, []);
+  return Array.isArray(arr) ? arr : [];
+}
+
+function saveSavedMeals(arr) {
+  localStorage.setItem(SAVED_KEY, JSON.stringify(arr));
+}
+
 export default function SavedMeals() {
-  const [saved, setSaved] = useState([]);
+  const navigate = useNavigate();
+  const [savedMeals, setSavedMeals] = useState([]);
+
+  // Track which meal is being removed (for animation)
+  const [removingId, setRemovingId] = useState(null);
 
   useEffect(() => {
-    setSaved(getSaved());
+    setSavedMeals(loadSavedMeals());
   }, []);
 
-  const refresh = () => setSaved(getSaved());
+  const savedIds = useMemo(() => {
+    return new Set(savedMeals.map((m) => m._id || m.name));
+  }, [savedMeals]);
 
-  const clearAll = () => {
-    localStorage.removeItem("vb_saved_meals");
-    setSaved([]);
-  };
+  function removeWithAnimation(meal) {
+    if (!meal) return;
+    const id = meal._id || meal.name;
+
+    // trigger heartbreak animation
+    setRemovingId(id);
+
+    // wait for animation then remove
+    setTimeout(() => {
+      setSavedMeals((prev) => {
+        const next = prev.filter((m) => (m._id || m.name) !== id);
+        saveSavedMeals(next);
+        return next;
+      });
+      setRemovingId(null);
+    }, 450); // duration must match CSS animation
+  }
 
   return (
-    <div className="mx-auto max-w-4xl p-6 space-y-6">
-      <div className="fade-in">
-        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">
-          Saved Meals
-        </h1>
-        <p className="mt-1 text-slate-600 dark:text-slate-300">
-          Your bookmarked food suggestions (stored on this device).
-        </p>
-        <div className="mt-4 h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent dark:via-slate-700" />
-      </div>
+    <div className="mx-auto max-w-6xl px-4 py-8 space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900">Saved Meals</h1>
+          <p className="mt-1 text-slate-600">
+            Your saved recommendations are stored in this device/browser.
+          </p>
+        </div>
 
-      <div className="flex flex-wrap gap-3">
         <button
-          onClick={refresh}
-          className="rounded-2xl border border-slate-200 bg-white px-5 py-2 text-sm font-bold text-slate-800 shadow-sm transition hover:shadow active:scale-95 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+          className="rounded-full border border-slate-300 bg-white px-5 py-2 font-semibold text-slate-800 hover:bg-slate-50"
+          onClick={() => navigate(-1)}
         >
-          Refresh
-        </button>
-        <button
-          onClick={clearAll}
-          className="rounded-2xl bg-pink-600 px-5 py-2 text-sm font-bold text-white shadow-sm transition hover:opacity-95 active:scale-95"
-        >
-          Clear All
+          Back
         </button>
       </div>
 
-      {saved.length === 0 ? (
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-          No saved meals yet. Go to Recommendations and tap <b>Save</b>.
+      {savedMeals.length === 0 ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-700">
+          No saved meals yet. Go back and tap <b>♡ Save</b> on a meal.
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {saved.map((item) => (
-            <FoodCard key={item.key} item={item} />
-          ))}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {savedMeals.map((meal) => {
+            const id = meal._id || meal.name;
+            const isRemoving = removingId === id;
+
+            return (
+              <div
+                key={id}
+                className={`${isRemoving ? "heartbreakWrap" : ""}`}
+              >
+                <FoodCard
+                  meal={meal}
+                  // For saved page: clicking "Saved" removes (with animation)
+                  onSave={removeWithAnimation}
+                  isSaved={savedIds.has(id)}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
+
+      {/* Animation CSS */}
+      <style>{`
+        .heartbreakWrap {
+          animation: heartbreak 0.45s ease-in-out forwards;
+          transform-origin: center;
+        }
+
+        @keyframes heartbreak {
+          0%   { transform: scale(1); opacity: 1; filter: grayscale(0); }
+          35%  { transform: scale(1.03) rotate(-1deg); opacity: 1; }
+          65%  { transform: scale(0.98) rotate(1deg); opacity: 0.85; filter: grayscale(0.6); }
+          100% { transform: scale(0.92); opacity: 0; filter: grayscale(1); }
+        }
+      `}</style>
     </div>
   );
 }

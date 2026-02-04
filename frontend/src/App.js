@@ -38,6 +38,7 @@ export default function App() {
             <Route path="/feedback" element={<PageShell><FeedbackPage /></PageShell>} />
             <Route path="/about" element={<PageShell><AboutPage /></PageShell>} />
             <Route path="/saved" element={<PageShell><SavedMeals /></PageShell>} />
+            <Route path="/saved" element={<SavedMeals />} />
           </Routes>
         </div>
       </Router>
