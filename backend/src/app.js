@@ -9,7 +9,11 @@ const mealRoutes = require("./routes/mealRoutes");
 const feedbackRoutes = require("./routes/feedbackRoutes");
 
 const app = express();
+
+// If you want, later we can restrict origins to your Vercel URL.
+// For now, this is fine:
 app.use(cors());
+
 app.use(express.json());
 
 connectDB();
