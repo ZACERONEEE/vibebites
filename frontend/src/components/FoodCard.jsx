@@ -1,179 +1,174 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { getFallbackImage, DEFAULT_FALLBACK } from "../data/mealImageFallbacks";
 
-function getSaved() {
-  try {
-    const raw = localStorage.getItem("vb_saved_meals");
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+function normalizeAllergenTags(tags) {
+  if (!Array.isArray(tags)) return [];
+  return tags.map((t) => String(t || "").trim().toLowerCase()).filter(Boolean);
 }
 
-function setSaved(list) {
-  localStorage.setItem("vb_saved_meals", JSON.stringify(list));
+function formatAllergen(tag) {
+  const map = {
+    seafood: "Seafood",
+    dairy: "Dairy",
+    nuts: "Nuts",
+    egg: "Egg",
+    soy: "Soy",
+    gluten: "Gluten",
+    chicken: "Chicken",
+  };
+  return map[tag] || (tag ? tag[0].toUpperCase() + tag.slice(1) : "");
 }
 
-export default function FoodCard({ item }) {
-  const [open, setOpen] = useState(false);
-  const [saved, setSavedState] = useState(false);
+function toNumber(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
 
-  const key = useMemo(
-    () => item._id || `${item.name}-${item.mood}-${item.category}`,
-    [item]
+export default function FoodCard({ meal, onSave, isSaved = false }) {
+  const name = meal?.name || "Meal";
+  const description = meal?.description || "";
+  const category = meal?.category || "";
+  const mealTime = meal?.mealTime || "";
+  const isVegetarian = !!meal?.isVegetarian;
+
+  const allergens = useMemo(
+    () => normalizeAllergenTags(meal?.allergenTags),
+    [meal?.allergenTags]
   );
 
-  // ✅ SUPPORT BOTH nutrition formats
-  const calories = item?.nutrition?.calories ?? item.calories ?? null;
-  const protein_g = item?.nutrition?.protein_g ?? item.protein_g ?? null;
-  const carbs_g = item?.nutrition?.carbs_g ?? item.carbs_g ?? null;
-  const fat_g = item?.nutrition?.fat_g ?? item.fat_g ?? null;
+  // ✅ Nutrition (supports null safely)
+  const calories = toNumber(meal?.calories);
+  const protein = toNumber(meal?.protein_g);
+  const carbs = toNumber(meal?.carbs_g);
+  const fat = toNumber(meal?.fat_g);
 
   const hasNutrition =
-    calories !== null || protein_g !== null || carbs_g !== null || fat_g !== null;
+    calories !== null || protein !== null || carbs !== null || fat !== null;
 
-  useEffect(() => {
-    const list = getSaved();
-    setSavedState(list.some((x) => x.key === key));
-  }, [key]);
+  const [showNutrition, setShowNutrition] = useState(false);
 
-  const toggleSave = () => {
-    const list = getSaved();
+  // ✅ IMAGE LOGIC:
+  // 1) use DB imageUrl if present and not empty
+  // 2) fallback by category+mealTime
+  // 3) final fallback = /logo.png
+  const preferredSrc = useMemo(() => {
+    const dbUrl = (meal?.imageUrl || "").trim();
+    if (dbUrl) return dbUrl;
+    return getFallbackImage(category, mealTime);
+  }, [meal?.imageUrl, category, mealTime]);
 
-    if (list.some((x) => x.key === key)) {
-      const next = list.filter((x) => x.key !== key);
-      setSaved(next);
-      setSavedState(false);
-      return;
-    }
-
-    const payload = {
-      key,
-      name: item.name,
-      description: item.description,
-      mood: item.mood,
-      category: item.category,
-      hungerLevel: item.hungerLevel,
-      preference: item.preference,
-      mealTime: item.mealTime || "",
-      isVegetarian: !!item.isVegetarian,
-      allergenTags: item.allergenTags || [],
-      imageUrl: item.imageUrl || "",
-
-      // store nutrition in BOTH formats for compatibility
-      nutrition: { calories, protein_g, carbs_g, fat_g },
-      calories,
-      protein_g,
-      carbs_g,
-      fat_g,
-    };
-
-    const next = [payload, ...list].slice(0, 200);
-    setSaved(next);
-    setSavedState(true);
-  };
-
-  const imgSrc = item.imageUrl && item.imageUrl.trim() ? item.imageUrl : "/logo.png";
+  const [imgSrc, setImgSrc] = useState(preferredSrc);
+  useEffect(() => setImgSrc(preferredSrc), [preferredSrc]);
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl dark:border-slate-800 dark:bg-slate-900">
-      {/* Image */}
-      <div className="relative h-40 w-full bg-slate-100 dark:bg-slate-800">
+    <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      {/* IMAGE */}
+      <div className="relative h-44 w-full bg-slate-100">
         <img
           src={imgSrc}
-          alt={item.name}
-          className="h-40 w-full object-cover"
-          onError={(e) => {
-            e.currentTarget.src = "/logo.png";
-          }}
+          alt={name}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={() => setImgSrc(DEFAULT_FALLBACK)}
         />
-        <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-extrabold text-slate-900 shadow dark:bg-slate-900/80 dark:text-slate-100">
-          {item.category}
-        </div>
+
+        {category ? (
+          <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow">
+            {category}
+          </div>
+        ) : null}
       </div>
 
-      {/* Content */}
-      <div className="p-4">
+      {/* CONTENT */}
+      <div className="p-5">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="text-base font-extrabold text-slate-900 dark:text-slate-100">
-                {item.name}
-              </div>
+          <h3 className="text-lg font-extrabold text-slate-900 leading-snug">
+            {name}
+            {mealTime ? (
+              <span className="text-slate-500 font-semibold"> ({mealTime})</span>
+            ) : null}
+          </h3>
 
-              <button
-                type="button"
-                onClick={toggleSave}
-                className={`rounded-full px-3 py-1 text-xs font-extrabold transition active:scale-95 ${
-                  saved
-                    ? "bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-200"
-                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                }`}
-                title={saved ? "Remove from saved" : "Save this meal"}
-              >
-                {saved ? "♥ Saved" : "♡ Save"}
-              </button>
-            </div>
-
-            <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              {item.description}
-            </div>
-
-            <div className="mt-2 flex flex-wrap gap-2">
-              {item.isVegetarian && (
-                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
-                  Vegetarian
-                </span>
-              )}
-              {item.mealTime && (
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                  {item.mealTime}
-                </span>
-              )}
-              {Array.isArray(item.allergenTags) && item.allergenTags.length > 0 && (
-                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-                  Contains: {item.allergenTags.join(", ")}
-                </span>
-              )}
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => onSave?.(meal)}
+            className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold border transition ${
+              isSaved
+                ? "bg-slate-900 text-white border-slate-900"
+                : "bg-white text-slate-900 border-slate-200 hover:border-slate-300"
+            }`}
+          >
+            {isSaved ? "Saved" : "♡ Save"}
+          </button>
         </div>
 
-        {/* Nutrition dropdown */}
+        {description ? (
+          <p className="mt-2 text-sm text-slate-600">{description}</p>
+        ) : null}
+
+        {/* TAGS */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          {isVegetarian ? (
+            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
+              Vegetarian
+            </span>
+          ) : null}
+
+          {mealTime ? (
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+              {mealTime}
+            </span>
+          ) : null}
+
+          {allergens.length > 0 ? (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+              Contains: {allergens.map(formatAllergen).join(", ")}
+            </span>
+          ) : (
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              Allergens: None listed
+            </span>
+          )}
+        </div>
+
+        {/* NUTRITION */}
         <div className="mt-4">
           <button
             type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-800 transition hover:shadow active:scale-95 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+            onClick={() => setShowNutrition((s) => !s)}
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:border-slate-300 transition"
           >
-            {open ? "Hide nutrition info ▲" : "Show nutrition info ▼"}
+            {showNutrition ? "Hide nutrition info ▲" : "Show nutrition info ▼"}
           </button>
 
-          {open && (
-            <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
-              {!hasNutrition ? (
-                <div>Nutrition info is not available for this item yet.</div>
+          {showNutrition ? (
+            <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800">
+              {hasNutrition ? (
+                <div className="space-y-1">
+                  <div>
+                    Calories: <span className="font-bold">{calories ?? "N/A"}</span>
+                  </div>
+                  <div>
+                    Protein (g): <span className="font-bold">{protein ?? "N/A"}</span>
+                  </div>
+                  <div>
+                    Carbs (g): <span className="font-bold">{carbs ?? "N/A"}</span>
+                  </div>
+                  <div>
+                    Fat (g): <span className="font-bold">{fat ?? "N/A"}</span>
+                  </div>
+                  <div className="mt-2 text-xs text-slate-500">
+                    *Values are estimates for general guidance only.
+                  </div>
+                </div>
               ) : (
-                <ul className="space-y-1">
-                  <li>
-                    Calories: <b>{calories ?? "N/A"}</b>
-                  </li>
-                  <li>
-                    Protein (g): <b>{protein_g ?? "N/A"}</b>
-                  </li>
-                  <li>
-                    Carbs (g): <b>{carbs_g ?? "N/A"}</b>
-                  </li>
-                  <li>
-                    Fat (g): <b>{fat_g ?? "N/A"}</b>
-                  </li>
-                </ul>
+                <div className="text-slate-600">
+                  Nutrition data not available for this item yet.
+                </div>
               )}
-
-              <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                *Values are estimates for general guidance only.
-              </div>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
