@@ -1,171 +1,201 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import DisclaimerBox from "../components/DisclaimerBox";
 import FoodCard from "../components/FoodCard";
 import LoadingOverlay from "../components/LoadingOverlay";
 
+const API = process.env.REACT_APP_API_URL || "https://vibebites-backend.onrender.com";
+
+function Section({ title, items }) {
+  if (!items || items.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-end justify-between">
+        <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+        <span className="text-xs text-slate-500">{items.length} item(s)</span>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {items.map((meal) => (
+          <FoodCard key={meal._id || `${meal.name}-${title}`} meal={meal} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function MealSuggestions() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // values passed from MoodSelection (or previous page)
   const {
     mood,
     hungerLevel,
     preference,
+    mealTime = "Any",
     vegetarianOnly = false,
-    mealTime = "",
     avoid = [],
   } = location.state || {};
 
-  const [data, setData] = useState(null);
+  const [grouped, setGrouped] = useState(null); // grouped results
+  const [meta, setMeta] = useState(null); // filters, count etc
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const fetchMeals = async () => {
-    try {
-      setLoading(true);
-      setError("");
+  // used to force "Regenerate"
+  const [refreshKey, setRefreshKey] = useState(0);
 
-      if (!mood || !hungerLevel || !preference) {
-        navigate("/");
-        return;
-      }
+  const query = useMemo(() => {
+    const params = new URLSearchParams();
+    if (mood) params.set("mood", mood);
+    if (hungerLevel) params.set("hungerLevel", hungerLevel);
+    if (preference) params.set("preference", preference);
 
-      const params = new URLSearchParams({
-        mood,
-        hungerLevel,
-        preference,
-      });
+    // backend supports mealTime; allow "Any" to mean "no filter"
+    if (mealTime && mealTime !== "Any") params.set("mealTime", mealTime);
 
-      if (vegetarianOnly) params.append("vegetarian", "true");
-      if (mealTime) params.append("mealTime", mealTime);
+    if (vegetarianOnly) params.set("vegetarianOnly", "true");
 
-      // ✅ add avoid list
-      if (avoid && avoid.length > 0) {
-        params.append("avoid", avoid.join(","));
-      }
-
-      const res = await fetch(
-        `${process.env.REACT_APP_API_URL}/api/meals?${params.toString()}`
-      );
-
-      if (!res.ok) throw new Error("Failed to fetch meal suggestions");
-      const json = await res.json();
-
-      setData(json);
-    } catch (err) {
-      setError(err.message || "Something went wrong");
-    } finally {
-      setLoading(false);
+    if (Array.isArray(avoid) && avoid.length > 0) {
+      // backend expects comma-separated
+      params.set("avoid", avoid.join(","));
     }
-  };
+
+    // cache-buster (so regenerate truly refetches)
+    params.set("_t", String(Date.now()));
+
+    return params.toString();
+  }, [mood, hungerLevel, preference, mealTime, vegetarianOnly, avoid]);
+
 
   useEffect(() => {
-    fetchMeals();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mood, hungerLevel, preference, vegetarianOnly, mealTime, JSON.stringify(avoid)]);
+    // If user landed here without required data, send them back properly
+    if (!mood || !hungerLevel || !preference) {
+      setError("Missing answers. Please answer the quick check-in first.");
+      setLoading(false);
+      return;
+    }
 
-  if (loading) {
-    return <LoadingOverlay show={true} label="Finding food suggestions..." />;
-  }
+    let cancelled = false;
 
-  if (error) {
-    return (
-      <div className="mx-auto max-w-xl p-6 text-center">
-        <p className="text-red-600 font-bold">{error}</p>
-        <button
-          onClick={() => navigate(-1)}
-          className="mt-4 rounded-xl bg-slate-900 px-5 py-2 text-white font-bold"
-        >
-          Go back
-        </button>
-      </div>
-    );
-  }
+    async function load() {
+      try {
+        setLoading(true);
+        setError("");
 
-  if (!data) return null;
+        const res = await fetch(`${API}/api/meals?${query}`);
+        if (!res.ok) throw new Error(`Request failed (${res.status})`);
 
-  const { fullMeals, appetizers, desserts, drinks, snacks } = data;
+        const json = await res.json();
 
-  const Section = ({ title, items }) => {
-    if (!items || items.length === 0) return null;
+        // ✅ IMPORTANT: your backend returns { results: { "Full Meal": [...], ... }, count, filters, mood }
+        const results = json.results || null;
 
-    return (
-      <section className="mt-8">
-        <h2 className="mb-4 text-xl font-extrabold text-slate-900 dark:text-slate-100">
-          {title}
-        </h2>
+        if (!cancelled) {
+          setGrouped(results);
+          setMeta({
+            mood: json.mood,
+            filters: json.filters,
+            count: json.count,
+          });
+        }
+      } catch (e) {
+        if (!cancelled) setError(e.message || "Failed to load meals");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
 
-        <div className="grid gap-4 md:grid-cols-2">
-          {items.map((item) => (
-            <FoodCard key={item._id || `${item.name}-${title}`} item={item} />
-          ))}
-        </div>
-      </section>
-    );
-  };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [query, mood, hungerLevel, preference, refreshKey]);
+
+
+  const selectedLine = meta?.filters
+    ? `${meta.filters.mood} · ${meta.filters.hungerLevel} · ${meta.filters.preference} · ${meta.filters.mealTime || "Any"}`
+    : "";
 
   return (
-    <div className="mx-auto max-w-4xl p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">
-          Your Food Suggestions
-        </h1>
-        <p className="mt-1 text-slate-600 dark:text-slate-300">
-          Based on your mood, hunger level, and preference
-        </p>
-      </div>
+    <div className="mx-auto max-w-6xl px-4 py-8">
+      <LoadingOverlay show={loading} />
 
-      <DisclaimerBox />
-
-      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
-        <div className="font-extrabold text-slate-900 dark:text-slate-100">
-          Why these were suggested
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-extrabold text-slate-900">Your Food Suggestions</h1>
+          <p className="mt-1 text-slate-600">Based on your mood, hunger level, and preference</p>
         </div>
-        <div className="mt-1 leading-relaxed">
-          Based on your selections: <b>{mood}</b> • <b>{hungerLevel}</b> •{" "}
-          <b>{preference}</b>
-          {vegetarianOnly ? " • Vegetarian only" : ""}
-          {mealTime ? ` • ${mealTime}` : ""}
-          {avoid.length > 0 ? ` • Avoid: ${avoid.join(", ")}` : ""}
-          {preference === "Surprise" ? (
-            <>
-              <br />
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                Surprise mode shows mixed options for variety.
-              </span>
-            </>
-          ) : null}
+
+        <DisclaimerBox />
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <h3 className="font-semibold text-slate-900">Why these were suggested</h3>
+          <p className="mt-1 text-sm text-slate-600">
+            Based on your selections: <span className="font-semibold text-slate-900">{selectedLine}</span>
+          </p>
         </div>
-      </div>
 
-      <Section title="Full Meals" items={fullMeals} />
-      <Section title="Appetizers" items={appetizers} />
-      <Section title="Desserts" items={desserts} />
-      <Section title="Drinks" items={drinks} />
-      <Section title="Snacks" items={snacks} />
+        <div className="flex flex-wrap gap-3">
+          <button
+            className="rounded-full border border-slate-300 bg-white px-5 py-2 font-semibold text-slate-800 hover:bg-slate-50"
+            onClick={() => navigate("/moods")}
+          >
+            Change mood
+          </button>
 
-      <div className="mt-10 flex flex-wrap justify-center gap-3">
-        <button
-          onClick={() => navigate("/moods")}
-          className="rounded-2xl border border-slate-300 px-6 py-3 font-bold text-slate-800 transition hover:bg-slate-100 active:scale-95 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-        >
-          Change mood
-        </button>
-        <button
-          onClick={() => navigate("/questions", { state: { mood } })}
-          className="rounded-2xl border border-slate-300 px-6 py-3 font-bold text-slate-800 transition hover:bg-slate-100 active:scale-95 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-        >
+          <button
+            className="rounded-full border border-slate-300 bg-white px-5 py-2 font-semibold text-slate-800 hover:bg-slate-50"
+            onClick={() =>
+              navigate("/questions", {
+                state: {
+                mood, // ✅ keep mood
+                hungerLevel,
+                preference,
+                mealTime,
+                vegetarianOnly,
+                avoid,
+                },
+              })
+            }
+          >
           Change selections
-        </button>
+          </button>
 
-        <button
-          onClick={fetchMeals}
-          className="rounded-2xl bg-orange-600 px-6 py-3 font-bold text-white transition hover:opacity-95 active:scale-95"
-        >
-          Regenerate 🔄
-        </button>
+          <button
+            className="rounded-full bg-orange-600 px-5 py-2 font-semibold text-white hover:bg-orange-700"
+            onClick={() => setRefreshKey((k) => k + 1)}
+          >
+            Regenerate ↻
+          </button>
+        </div>
+
+        {error && (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* ✅ RENDER GROUPED RESULTS */}
+        {grouped && (
+          <div className="space-y-10">
+            <Section title="Full Meals" items={grouped["Full Meal"]} />
+            <Section title="Appetizers" items={grouped["Appetizer"]} />
+            <Section title="Desserts" items={grouped["Dessert"]} />
+            <Section title="Drinks" items={grouped["Drink"]} />
+            <Section title="Snacks" items={grouped["Snack"]} />
+          </div>
+        )}
+
+        {/* If grouped is null but no error, show empty state */}
+        {!loading && !error && !grouped && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-700">
+            No meals returned.
+          </div>
+        )}
       </div>
     </div>
   );
