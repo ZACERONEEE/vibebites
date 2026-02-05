@@ -8,7 +8,9 @@ function StatChip({ label, value, unit }) {
       </div>
       <div className="mt-0.5 text-sm font-bold text-slate-900">
         {value ?? "N/A"}
-        {value != null && unit ? <span className="ml-1 text-xs font-semibold text-slate-600">{unit}</span> : null}
+        {value != null && unit ? (
+          <span className="ml-1 text-xs font-semibold text-slate-600">{unit}</span>
+        ) : null}
       </div>
     </div>
   );
@@ -37,6 +39,12 @@ export default function FoodCard({ meal, onSave, isSaved = false }) {
     return url.length > 0 ? url : "";
   }, [meal]);
 
+  // ✅ Remove "(Breakfast)" "(Lunch)" "(Dinner)" suffix from displayed name
+  const displayName = useMemo(() => {
+    const raw = (meal?.name || "Meal").trim();
+    return raw.replace(/\s*\((Breakfast|Lunch|Dinner)\)\s*$/i, "");
+  }, [meal?.name]);
+
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
       {/* IMAGE */}
@@ -44,7 +52,7 @@ export default function FoodCard({ meal, onSave, isSaved = false }) {
         {imageSrc && !imgError ? (
           <img
             src={imageSrc}
-            alt={meal?.name || "Meal"}
+            alt={displayName}
             className="h-full w-full object-cover"
             loading="lazy"
             referrerPolicy="no-referrer"
@@ -58,11 +66,7 @@ export default function FoodCard({ meal, onSave, isSaved = false }) {
 
         {/* Top pills */}
         <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-          {meal?.category ? (
-            <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 backdrop-blur">
-              {meal.category}
-            </span>
-          ) : null}
+          {/* ✅ Removed category pill to avoid repeating section header */}
 
           {meal?.mealTime ? (
             <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 backdrop-blur">
@@ -77,8 +81,8 @@ export default function FoodCard({ meal, onSave, isSaved = false }) {
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="text-lg font-bold text-slate-900 break-words">
-              {meal?.name || "Meal"}
+            <h3 className="break-words text-lg font-bold text-slate-900">
+              {displayName}
             </h3>
             {meal?.description ? (
               <p className="mt-1 text-sm text-slate-600">{meal.description}</p>
@@ -90,7 +94,7 @@ export default function FoodCard({ meal, onSave, isSaved = false }) {
             onClick={() => onSave?.(meal)}
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
-            className={`shrink-0 rounded-full px-3 py-1 text-sm font-semibold border transition ${heartClasses}`}
+            className={`shrink-0 rounded-full border px-3 py-1 text-sm font-semibold transition ${heartClasses}`}
           >
             {heartLabel}
           </button>
@@ -131,7 +135,7 @@ export default function FoodCard({ meal, onSave, isSaved = false }) {
 
             {/* Chevron */}
             <div
-              className={`ml-3 grid h-9 w-9 place-items-center rounded-full bg-white border border-slate-200 transition ${
+              className={`ml-3 grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white transition ${
                 open ? "rotate-180" : "rotate-0"
               }`}
               aria-hidden="true"
@@ -170,7 +174,6 @@ export default function FoodCard({ meal, onSave, isSaved = false }) {
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );
