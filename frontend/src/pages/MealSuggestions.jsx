@@ -68,9 +68,6 @@ export default function MealSuggestions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Regenerate trigger
-  const [refreshKey, setRefreshKey] = useState(0);
-
   // ✅ Saved meals (localStorage)
   const [savedMeals, setSavedMeals] = useState(() => {
     if (typeof window === "undefined") return [];
@@ -91,10 +88,8 @@ export default function MealSuggestions() {
 
       let next;
       if (exists) {
-        // unsave
         next = prev.filter((m) => (m._id || m.name) !== id);
       } else {
-        // save
         next = [meal, ...prev];
       }
 
@@ -103,6 +98,8 @@ export default function MealSuggestions() {
     });
   }
 
+  // ✅ No regenerate, no random cache-buster.
+  // The same inputs will always call the same URL.
   const query = useMemo(() => {
     const params = new URLSearchParams();
 
@@ -117,9 +114,6 @@ export default function MealSuggestions() {
     if (Array.isArray(avoid) && avoid.length > 0) {
       params.set("avoid", avoid.join(","));
     }
-
-    // cache-buster to ensure new request
-    params.set("_t", String(Date.now()));
 
     return params.toString();
   }, [mood, hungerLevel, preference, mealTime, vegetarianOnly, avoid]);
@@ -164,7 +158,7 @@ export default function MealSuggestions() {
     return () => {
       cancelled = true;
     };
-  }, [query, mood, hungerLevel, preference, refreshKey]);
+  }, [query, mood, hungerLevel, preference]);
 
   const selectedLine = meta?.filters
     ? `${meta.filters.mood} · ${meta.filters.hungerLevel} · ${meta.filters.preference} · ${
@@ -214,13 +208,6 @@ export default function MealSuggestions() {
             }
           >
             Change selections
-          </button>
-
-          <button
-            className="rounded-full bg-orange-600 px-5 py-2 font-semibold text-white hover:bg-orange-700"
-            onClick={() => setRefreshKey((k) => k + 1)}
-          >
-            Regenerate ↻
           </button>
 
           <button
