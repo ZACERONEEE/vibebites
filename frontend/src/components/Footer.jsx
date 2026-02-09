@@ -55,7 +55,7 @@ export default function Footer() {
           </div>
 
           <div className="text-white/50">
-            Capstone Project • BSIT
+            Capstone Project • Holy Angel University BSIT Major in Web Development
           </div>
         </div>
       </div>
