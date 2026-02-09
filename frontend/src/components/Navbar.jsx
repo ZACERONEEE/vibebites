@@ -46,7 +46,7 @@ export default function Navbar() {
           <LinkItem to="/moods" label="Moods" />
           <LinkItem to="/saved" label="Saved" />
           <LinkItem to="/feedback" label="Feedback" />
-          <LinkItem to="/about" label="About" />
+          <LinkItem to="/about" label="About Us" />
 
           <button
             onClick={toggleTheme}

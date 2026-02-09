@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ✅ Montserrat (Google Font must be added in public/index.html head) */
+html,
+body {
+  font-family: "Montserrat", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 /* Global background (light + dark) */
 body {
   @apply bg-gradient-to-b from-orange-50 via-white to-emerald-50 text-slate-900;

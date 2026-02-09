@@ -50,7 +50,7 @@ export default function MoodSelection() {
 
       <div className="fade-in">
         <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100">
-          Choose your mood
+          CHOOSE YOUR MOOD
         </h2>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
           Select how you feel first, then we’ll ask a few quick questions.
