@@ -32,8 +32,12 @@ function Section({ title, items, savedIds, onSave }) {
   return (
     <div className="space-y-3">
       <div className="flex items-end justify-between">
-        <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-        <span className="text-xs text-slate-500">{items.length} item(s)</span>
+        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+          {title}
+        </h2>
+        <span className="text-xs text-slate-500 dark:text-slate-400">
+          {items.length} item(s)
+        </span>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -99,7 +103,6 @@ export default function MealSuggestions() {
   }
 
   // ✅ No regenerate, no random cache-buster.
-  // The same inputs will always call the same URL.
   const query = useMemo(() => {
     const params = new URLSearchParams();
 
@@ -172,20 +175,28 @@ export default function MealSuggestions() {
 
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900">Your Food Suggestions</h1>
-          <p className="mt-1 text-slate-600">Based on your mood, hunger level, and preference</p>
+          <h1 className="text-3xl font-extrabold text-slate-900 dark:text-slate-100">
+            Your Food Suggestions
+          </h1>
+          <p className="mt-1 text-slate-600 dark:text-slate-300">
+            Based on your mood, hunger level, and preference
+          </p>
         </div>
 
         <DisclaimerBox />
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h3 className="font-semibold text-slate-900">Why these were suggested</h3>
-          <p className="mt-1 text-sm text-slate-600">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+            Why these were suggested
+          </h3>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
             Based on your selections:{" "}
-            <span className="font-semibold text-slate-900">{selectedLine}</span>
+            <span className="font-semibold text-slate-900 dark:text-slate-100">
+              {selectedLine}
+            </span>
           </p>
           {meta?.count != null ? (
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               {meta.count} matching meals in database (showing a few per category).
             </p>
           ) : null}
@@ -193,14 +204,14 @@ export default function MealSuggestions() {
 
         <div className="flex flex-wrap gap-3">
           <button
-            className="rounded-full border border-slate-300 bg-white px-5 py-2 font-semibold text-slate-800 hover:bg-slate-50"
+            className="rounded-full border border-slate-300 bg-white px-5 py-2 font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
             onClick={() => navigate("/moods")}
           >
             Change mood
           </button>
 
           <button
-            className="rounded-full border border-slate-300 bg-white px-5 py-2 font-semibold text-slate-800 hover:bg-slate-50"
+            className="rounded-full border border-slate-300 bg-white px-5 py-2 font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
             onClick={() =>
               navigate("/questions", {
                 state: { mood, hungerLevel, preference, mealTime, vegetarianOnly, avoid },
@@ -211,7 +222,7 @@ export default function MealSuggestions() {
           </button>
 
           <button
-            className="rounded-full border border-slate-300 bg-white px-5 py-2 font-semibold text-slate-800 hover:bg-slate-50"
+            className="rounded-full border border-slate-300 bg-white px-5 py-2 font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
             onClick={() => navigate("/saved")}
           >
             View Saved ({savedMeals.length})
@@ -219,23 +230,48 @@ export default function MealSuggestions() {
         </div>
 
         {error && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200">
             {error}
           </div>
         )}
 
         {grouped && (
           <div className="space-y-10">
-            <Section title="Full Meals" items={grouped["Full Meal"]} savedIds={savedIds} onSave={handleSaveMeal} />
-            <Section title="Appetizers" items={grouped["Appetizer"]} savedIds={savedIds} onSave={handleSaveMeal} />
-            <Section title="Desserts" items={grouped["Dessert"]} savedIds={savedIds} onSave={handleSaveMeal} />
-            <Section title="Drinks" items={grouped["Drink"]} savedIds={savedIds} onSave={handleSaveMeal} />
-            <Section title="Snacks" items={grouped["Snack"]} savedIds={savedIds} onSave={handleSaveMeal} />
+            <Section
+              title="Full Meals"
+              items={grouped["Full Meal"]}
+              savedIds={savedIds}
+              onSave={handleSaveMeal}
+            />
+            <Section
+              title="Appetizers"
+              items={grouped["Appetizer"]}
+              savedIds={savedIds}
+              onSave={handleSaveMeal}
+            />
+            <Section
+              title="Desserts"
+              items={grouped["Dessert"]}
+              savedIds={savedIds}
+              onSave={handleSaveMeal}
+            />
+            <Section
+              title="Drinks"
+              items={grouped["Drink"]}
+              savedIds={savedIds}
+              onSave={handleSaveMeal}
+            />
+            <Section
+              title="Snacks"
+              items={grouped["Snack"]}
+              savedIds={savedIds}
+              onSave={handleSaveMeal}
+            />
           </div>
         )}
 
         {!loading && !error && !grouped && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-700">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
             No meals returned.
           </div>
         )}
