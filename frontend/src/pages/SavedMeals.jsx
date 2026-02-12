@@ -59,7 +59,7 @@ export default function SavedMeals() {
     <div className="mx-auto max-w-6xl px-4 py-8 space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900">Saved Meals</h1>
+          <h1 className="text-3xl font-extrabold text-slate-900 dark:text-slate-100">Saved Meals</h1>
           <p className="mt-1 text-slate-600">
             Your saved recommendations are stored in this device/browser.
           </p>
