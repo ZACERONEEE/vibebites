@@ -26,7 +26,7 @@ export default function LandingPage() {
           </div>
 
           <p className="text-lg leading-relaxed text-slate-600 dark:text-slate-300">
-            Answer a quick check-in, choose your mood, and receive meal suggestions grouped by category —
+            Answer a quick check-in, choose your mood, and receive meal suggestions grouped by category
             with nutrition information and allergy reminders for safer choices.
           </p>
 
