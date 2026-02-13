@@ -9,6 +9,7 @@ import MealSuggestions from "./pages/MealSuggestions";
 import FeedbackPage from "./pages/FeedbackPage";
 import AboutPage from "./pages/AboutPage";
 import SavedMeals from "./pages/SavedMeals";
+import NotFound from "./pages/NotFound";
 
 import { ThemeProvider } from "./theme";
 
@@ -28,7 +29,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <Router>
-        {/* ✅ flex-col layout so Footer sticks to bottom */}
+        {/* Layout so footer stays at bottom */}
         <div className="min-h-screen flex flex-col transition-colors">
           <Navbar />
 
@@ -92,6 +93,16 @@ export default function App() {
               element={
                 <PageShell>
                   <SavedMeals />
+                </PageShell>
+              }
+            />
+
+            {/* ✅ 404 CATCH-ALL */}
+            <Route
+              path="*"
+              element={
+                <PageShell>
+                  <NotFound />
                 </PageShell>
               }
             />
