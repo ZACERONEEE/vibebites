@@ -29,7 +29,7 @@ export default function AboutPage() {
               Mission
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-              To provide students with simple, mood-aware Filipino meal suggestions
+              To provide a simple, mood-aware Filipino meal suggestions
               that encourage mindful eating helping users feel supported, reduce
               decision fatigue, and choose food options more intentionally while
               considering basic nutrition and allergen awareness.
@@ -41,7 +41,7 @@ export default function AboutPage() {
               Vision
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-              To be a trusted student-friendly platform that promotes healthier
+              To be a trusted friendly platform that promotes healthier
               food decision-making through ethical, responsible, and accessible
               recommendations while showcasing Filipino food culture in a modern
               and engaging way.
