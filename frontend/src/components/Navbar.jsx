@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, Link } from "react-router-dom";
 import { useTheme } from "../theme";
 
 const LinkItem = ({ to, label, onClick }) => (
@@ -27,18 +27,19 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/20 bg-gradient-to-r from-orange-500 to-emerald-500">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        {/* Brand */}
-        <div className="flex items-center gap-2">
-          <img
-            src="/logo.png"
-            alt="VibeBites Logo"
-            className="h-16 w-16"
-          />
+        {/* Brand (clickable to home) */}
+        <Link
+          to="/"
+          onClick={closeMenu}
+          className="flex items-center gap-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/60 hover:opacity-95 transition"
+          aria-label="Go to home"
+        >
+          <img src="/logo.png" alt="VibeBites Logo" className="h-16 w-16" />
           <div className="leading-tight">
             <div className="text-base font-extrabold text-white">VibeBites</div>
             <div className="text-xs text-white/80">Eat what you feel</div>
           </div>
-        </div>
+        </Link>
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-1 md:flex">
