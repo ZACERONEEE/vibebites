@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import LoadingOverlay from "../components/LoadingOverlay";
+
+const API = process.env.REACT_APP_API_URL || "https://vibebites-backend.onrender.com";
 
 const EMOJI = {
   Happy: "😊",
@@ -13,6 +15,7 @@ const EMOJI = {
 
 export default function MoodSelection() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [moods, setMoods] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -24,7 +27,7 @@ export default function MoodSelection() {
         setLoading(true);
         setError("");
 
-        const res = await fetch(`${process.env.REACT_APP_API_URL}/api/moods`);
+        const res = await fetch(`${API}/api/moods`);
         if (!res.ok) throw new Error("Failed to fetch moods");
 
         const data = await res.json();
@@ -40,8 +43,9 @@ export default function MoodSelection() {
   }, []);
 
   const chooseMood = (mood) => {
-    // ✅ Now we go to questions AFTER selecting mood
-    navigate("/questions", { state: { mood } });
+    // carry any existing answers if they exist (optional)
+    const carry = location.state || {};
+    navigate("/questions", { state: { ...carry, mood } });
   };
 
   return (
