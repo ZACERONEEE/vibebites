@@ -17,6 +17,7 @@ const ALLERGEN_KEYS = new Set([
 ]);
 
 const CATEGORIES = ["Full Meal", "Appetizer", "Dessert", "Drink", "Snack"];
+const MAX_PER_CATEGORY = 5;
 
 const norm = (v) => String(v || "").trim();
 
@@ -32,33 +33,50 @@ function parseAvoid(v) {
     .filter((x) => x && ALLERGEN_KEYS.has(x));
 }
 
-// deterministic fallback chain (no randomness)
-async function findWithFallbackLimited(baseQuery, fallbackSteps, limit) {
-  // strict first
-  let meals = await Meal.find(baseQuery)
-    .sort({ name: 1, _id: 1 })
-    .limit(limit)
-    .lean();
-  if (meals.length >= limit) return meals;
+/**
+ * Deterministically fill up to `limit` by:
+ * 1) strict query
+ * 2) then progressively relaxed queries (fallback steps)
+ * Avoid duplicates by _id.
+ */
+async function findWithFallbackFill(baseQuery, fallbackSteps, limit) {
+  const picked = [];
+  const pickedIds = new Set();
 
-  // fallback steps
-  for (const removeKeys of fallbackSteps) {
-    const q = { ...baseQuery };
-    for (const k of removeKeys) delete q[k];
+  async function addFromQuery(q) {
+    if (picked.length >= limit) return;
 
-    meals = await Meal.find(q)
-      .sort({ name: 1, _id: 1 })
-      .limit(limit)
+    const remaining = limit - picked.length;
+
+    const rows = await Meal.find(q)
+      .sort({ name: 1, _id: 1 }) // stable order
+      .limit(remaining)
       .lean();
 
-    if (meals.length >= 1) {
-      // if we got something, return it (or keep going only if you want to fill more)
-      // but we want "up to limit", so return it now.
-      return meals;
+    for (const r of rows) {
+      const id = String(r._id);
+      if (!pickedIds.has(id)) {
+        pickedIds.add(id);
+        picked.push(r);
+        if (picked.length >= limit) break;
+      }
     }
   }
 
-  return [];
+  // 1) strict
+  await addFromQuery(baseQuery);
+
+  // 2) fallbacks, top-up until limit
+  for (const removeKeys of fallbackSteps) {
+    if (picked.length >= limit) break;
+
+    const q = { ...baseQuery };
+    for (const k of removeKeys) delete q[k];
+
+    await addFromQuery(q);
+  }
+
+  return picked;
 }
 
 /**
@@ -75,68 +93,52 @@ router.get("/", async (req, res) => {
     const vegetarianOnly = parseBool(req.query.vegetarianOnly);
     const avoid = parseAvoid(req.query.avoid);
 
-    if (!mood) {
-      return res.status(400).json({ error: "mood is required" });
-    }
+    if (!mood) return res.status(400).json({ error: "mood is required" });
 
     if (hungerLevel && !VALID_HUNGER.has(hungerLevel)) {
       return res.status(400).json({ error: "Invalid hungerLevel" });
     }
-
     if (preference && !VALID_PREF.has(preference)) {
       return res.status(400).json({ error: "Invalid preference" });
     }
-
     if (!VALID_MEALTIME.has(mealTime)) {
       return res.status(400).json({ error: "Invalid mealTime" });
     }
 
-    // shared query base
+    // base filters
     const base = { mood };
 
     if (hungerLevel) base.hungerLevel = hungerLevel;
 
-    // Surprise means "no preference filter"
+    // Surprise = no preference filter
     if (preference && preference !== "Surprise") base.preference = preference;
 
-    // mealTime "Any" means no filter
+    // Any = no mealTime filter
     if (mealTime && mealTime !== "Any") base.mealTime = mealTime;
 
     if (vegetarianOnly) base.isVegetarian = true;
 
-    if (avoid.length > 0) {
-      base.allergenTags = { $nin: avoid };
-    }
+    if (avoid.length > 0) base.allergenTags = { $nin: avoid };
 
-    // fallback order (keep it deterministic)
-    // NOTE: This tries to keep your constraints first, then relaxes gradually.
+    // fallback order (relax gradually)
     const fallbackSteps = [
-      ["preference"], // loosen preference
-      ["preference", "hungerLevel"], // loosen hunger too
-      ["preference", "hungerLevel", "mealTime"], // loosen mealTime too
-      ["preference", "hungerLevel", "mealTime", "isVegetarian"], // loosen vegetarian
-      ["preference", "hungerLevel", "mealTime", "isVegetarian", "allergenTags"], // loosen avoid
-      // last resort: mood+category only (keep mood)
+      ["preference"], // relax preference
+      ["preference", "hungerLevel"], // relax hunger too
+      ["preference", "hungerLevel", "mealTime"], // relax mealtime too
+      ["preference", "hungerLevel", "mealTime", "isVegetarian"], // relax vegetarian
+      ["preference", "hungerLevel", "mealTime", "isVegetarian", "allergenTags"], // relax avoid
+      // last resort: mood + category only
       ["hungerLevel", "preference", "mealTime", "isVegetarian", "allergenTags"],
     ];
 
-    const MAX_PER_CATEGORY = 5;
-
-    // fetch per category so each can reach 5 (if DB has enough)
     const results = {};
     let totalReturned = 0;
 
     for (const category of CATEGORIES) {
       const q = { ...base, category };
-
-      const items = await findWithFallbackLimited(q, fallbackSteps, MAX_PER_CATEGORY);
-
-      if (items.length > 0) {
-        results[category] = items;
-        totalReturned += items.length;
-      } else {
-        results[category] = []; // keep key present so frontend is predictable
-      }
+      const items = await findWithFallbackFill(q, fallbackSteps, MAX_PER_CATEGORY);
+      results[category] = items;
+      totalReturned += items.length;
     }
 
     return res.json({
