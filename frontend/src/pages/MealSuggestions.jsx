@@ -72,7 +72,6 @@ export default function MealSuggestions() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // ✅ Saved meals (localStorage)
   const [savedMeals, setSavedMeals] = useState(() => {
     if (typeof window === "undefined") return [];
     return loadSavedMeals();
@@ -84,40 +83,30 @@ export default function MealSuggestions() {
 
   function handleSaveMeal(meal) {
     if (!meal) return;
-
     const id = meal._id || meal.name;
-
     setSavedMeals((prev) => {
       const exists = prev.some((m) => (m._id || m.name) === id);
-
       let next;
       if (exists) {
         next = prev.filter((m) => (m._id || m.name) !== id);
       } else {
         next = [meal, ...prev];
       }
-
       saveSavedMeals(next);
       return next;
     });
   }
 
-  // ✅ No regenerate, no random cache-buster.
   const query = useMemo(() => {
     const params = new URLSearchParams();
-
     if (mood) params.set("mood", mood);
     if (hungerLevel) params.set("hungerLevel", hungerLevel);
     if (preference) params.set("preference", preference);
-
     if (mealTime && mealTime !== "Any") params.set("mealTime", mealTime);
-
     if (vegetarianOnly) params.set("vegetarianOnly", "true");
-
     if (Array.isArray(avoid) && avoid.length > 0) {
       params.set("avoid", avoid.join(","));
     }
-
     return params.toString();
   }, [mood, hungerLevel, preference, mealTime, vegetarianOnly, avoid]);
 
@@ -134,7 +123,6 @@ export default function MealSuggestions() {
       try {
         setLoading(true);
         setError("");
-
         const res = await fetch(`${API}/api/meals?${query}`);
         if (!res.ok) throw new Error(`Request failed (${res.status})`);
 
@@ -237,36 +225,33 @@ export default function MealSuggestions() {
 
         {grouped && (
           <div className="space-y-10">
-            <Section
-              title="Full Meals"
-              items={grouped["Full Meal"]}
-              savedIds={savedIds}
-              onSave={handleSaveMeal}
-            />
-            <Section
-              title="Appetizers"
-              items={grouped["Appetizer"]}
-              savedIds={savedIds}
-              onSave={handleSaveMeal}
-            />
-            <Section
-              title="Desserts"
-              items={grouped["Dessert"]}
-              savedIds={savedIds}
-              onSave={handleSaveMeal}
-            />
-            <Section
-              title="Drinks"
-              items={grouped["Drink"]}
-              savedIds={savedIds}
-              onSave={handleSaveMeal}
-            />
-            <Section
-              title="Snacks"
-              items={grouped["Snack"]}
-              savedIds={savedIds}
-              onSave={handleSaveMeal}
-            />
+            <Section title="Full Meals" items={grouped["Full Meal"]} savedIds={savedIds} onSave={handleSaveMeal} />
+            <Section title="Appetizers" items={grouped["Appetizer"]} savedIds={savedIds} onSave={handleSaveMeal} />
+            <Section title="Desserts" items={grouped["Dessert"]} savedIds={savedIds} onSave={handleSaveMeal} />
+            <Section title="Drinks" items={grouped["Drink"]} savedIds={savedIds} onSave={handleSaveMeal} />
+            <Section title="Snacks" items={grouped["Snack"]} savedIds={savedIds} onSave={handleSaveMeal} />
+          </div>
+        )}
+
+        {/* ✅ THE NEW FEEDBACK CTA AT THE BOTTOM */}
+        {!loading && !error && (
+          <div className="mt-20 flex flex-col items-center justify-center space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-10 text-center dark:border-slate-800 dark:bg-slate-900/50">
+            <div className="space-y-1">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                How was your experience?
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Help us improve VibeBites by sharing your feedback.
+              </p>
+            </div>
+            
+            <button
+              onClick={() => navigate("/feedback")}
+              className="group flex items-center gap-2 rounded-full bg-slate-900 px-8 py-3 text-sm font-extrabold text-white shadow-xl transition-all hover:scale-105 hover:bg-slate-800 active:scale-95 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+            >
+              Give Feedback
+              <span className="transition-transform group-hover:translate-x-1">→</span>
+            </button>
           </div>
         )}
 

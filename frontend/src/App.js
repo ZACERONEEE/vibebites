@@ -29,83 +29,21 @@ export default function App() {
   return (
     <ThemeProvider>
       <Router>
-        {/* Layout so footer stays at bottom */}
         <div className="min-h-screen flex flex-col transition-colors">
           <Navbar />
 
           <Routes>
-            <Route
-              path="/"
-              element={
-                <PageShell>
-                  <LandingPage />
-                </PageShell>
-              }
-            />
-
-            <Route
-              path="/questions"
-              element={
-                <PageShell>
-                  <PreMoodQuestions />
-                </PageShell>
-              }
-            />
-
-            <Route
-              path="/moods"
-              element={
-                <PageShell>
-                  <MoodSelection />
-                </PageShell>
-              }
-            />
-
-            <Route
-              path="/suggestions"
-              element={
-                <PageShell>
-                  <MealSuggestions />
-                </PageShell>
-              }
-            />
-
-            <Route
-              path="/feedback"
-              element={
-                <PageShell>
-                  <FeedbackPage />
-                </PageShell>
-              }
-            />
-
-            <Route
-              path="/about"
-              element={
-                <PageShell>
-                  <AboutPage />
-                </PageShell>
-              }
-            />
-
-            <Route
-              path="/saved"
-              element={
-                <PageShell>
-                  <SavedMeals />
-                </PageShell>
-              }
-            />
-
-            {/* ✅ 404 CATCH-ALL */}
-            <Route
-              path="*"
-              element={
-                <PageShell>
-                  <NotFound />
-                </PageShell>
-              }
-            />
+            <Route path="/" element={<PageShell><LandingPage /></PageShell>} />
+            <Route path="/questions" element={<PageShell><PreMoodQuestions /></PageShell>} />
+            <Route path="/moods" element={<PageShell><MoodSelection /></PageShell>} />
+            <Route path="/suggestions" element={<PageShell><MealSuggestions /></PageShell>} />
+            
+            {/* ✅ UPDATED: Added /:mealId? so it accepts specific meals OR general feedback */}
+            <Route path="/feedback/:mealId?" element={<PageShell><FeedbackPage /></PageShell>} />
+            
+            <Route path="/about" element={<PageShell><AboutPage /></PageShell>} />
+            <Route path="/saved" element={<PageShell><SavedMeals /></PageShell>} />
+            <Route path="*" element={<PageShell><NotFound /></PageShell>} />
           </Routes>
 
           <Footer />
